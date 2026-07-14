@@ -311,15 +311,23 @@ behavior change.
 - Conclusion: the persistence layer is correct; #796's described symptom does not reproduce
   in this tree. The fix is already present and now protected by regression tests.
 
-### SEPARATE finding (not #796) — CLI `saveTokens` is orphaned, TI path broken
+### SEPARATE finding — CLI `saveTokens` was orphaned (TI path broken) — FIXED for codex
 - `src/lib/oauth/services/codex.js` (and claude/gemini/github/antigravity/openai/qwen/iflow)
-  import `getServerCredentials` from `../config/index.js`, which **does not exist** in the tree.
-- Their `saveTokens()` POST to `/api/cli/providers/<provider>`, and **no `src/app/api/cli/*`
-  route exists** (upstream 404s too). The CLI prints "connected successfully!" regardless of
-  the server response, so a CLI add appears to succeed but writes nothing.
-- This is the most likely real cause of a user reporting "added via TI, success shown, didn't
-  appear" — but it is a broader CLI-integration gap, not the Codex-specific persistence bug.
-- Recommended follow-up (out of scope for this commit): create `src/app/api/cli/providers/*`
-  routes that delegate to `createProviderConnection` (mirroring `/api/oauth/kiro/api-key`),
-  fix the `getServerCredentials` import to the real module, and make `saveTokens` surface the
-  server error instead of swallowing it.
+  imported `getServerCredentials` from `../config/index.js`, which **does not exist** in the tree,
+  and POSTed to `/api/cli/providers/<provider>` — a route that did not exist, so the CLI printed
+  "connected successfully!" while writing nothing. This is the real "added via TI, success shown,
+  didn't appear" gap.
+- Fix shipped this session:
+  - Added `src/lib/oauth/cliCredentials.js` exporting `getServerCredentials()` resolving the
+    server base URL (`NEXT_PUBLIC_BASE_URL`/`BASE_URL`) and the canonical machine-derived
+    CLI auth token (`x-9r-cli-token`, matches `cli/src/cli/api/client.js` + `dashboardGuard.js`).
+  - `codex.js` now imports from `@/lib/oauth/cliCredentials` (real module).
+  - Added `src/app/api/cli/providers/codex/route.js` (POST) — authenticates via `x-9r-cli-token`,
+    persists via `createProviderConnection`, returns `{ success, connection }`.
+  - Added `tests/unit/cli-providers-codex-route.test.js` (5 tests, real DB): 401 on missing/wrong
+    token, 400 on missing accessToken, 200 + appears in list, and #796 regression (second codex
+    connection persists, no silent overwrite).
+- Remaining siblings (claude/gemini/github/antigravity/openai/qwen/iflow) still import the old
+  dead path; the shipping `cli/` bundle does NOT use `src/lib/oauth/services/*` (it uses
+  `/api/oauth/{provider}/exchange`), so this only matters if those orphaned `saveTokens` paths
+  are wired up later. Tracked as follow-up, not blocking.

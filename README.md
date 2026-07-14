@@ -1420,12 +1420,15 @@ integration suite (`tests/translator/real/**`, `tests/e2e/**`) and a handful of
 environment-only unit files (see below) so the default run is hermetic.
 
 **Current status:** `npx vitest run --config vitest.config.js tests/unit`
-→ **947 passed / 21 skipped / 0 failed** (968 total), fully hermetic.
+→ **952 passed / 21 skipped / 0 failed** (973 total), fully hermetic.
 
 ### Notable regression tests
 - `tests/unit/codex-multiaccount-persistence.test.js` — #796: adding a second
   Codex account (distinct email, same email + distinct `chatgptAccountId`, or
   same email with no account id) always persists **two** rows; no silent merge.
+- `tests/unit/cli-providers-codex-route.test.js` — #796 CLI path: `POST /api/cli/providers/codex`
+  rejects missing/wrong `x-9r-cli-token` (401) and missing `accessToken` (400), and persists a
+  second Codex connection without silent overwrite.
 
 ### Live / environment-only tests (not run by default)
 - **Live** (`tests/translator/real/**`, `*.live.test.js`): hit real upstreams and
