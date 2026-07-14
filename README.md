@@ -1402,6 +1402,42 @@ Authorization: Bearer your-api-key
 
 ---
 
+## 🧪 Testing
+
+9Router uses [Vitest](https://vitest.dev/). The unit suite relies on the module
+aliases declared in `vitest.config.js` (`@` → `src`, `open-sse` → `open-sse`),
+so **always run tests with the config flag**:
+
+```bash
+npx vitest run --config vitest.config.js tests/unit
+# or a single file:
+npx vitest run --config vitest.config.js tests/unit/db-concurrent.test.js
+```
+
+Running `vitest run` without `--config` fails to resolve `open-sse/...` and `@/...`
+bare specifiers (40+ files error out). The config also excludes the live
+integration suite (`tests/translator/real/**`, `tests/e2e/**`) so the default run
+is hermetic.
+
+### Test tiers
+- **Unit** (`tests/unit/**`): hermetic, no network. Run with the command above.
+- **Live** (`tests/translator/real/**`, `*.live.test.js`): gated behind
+  `RUN_REAL=1`, require network + live provider credentials. They hit real
+  upstreams and may fail due to rate-limiting/network, not code defects.
+- **Framework note**: `kimchi.test.js` / `kimchi-strip-reasoning.test.js` use
+  Node's built-in `node:test` runner, not Vitest — run them with
+  `node --test tests/unit/kimchi.test.js`.
+
+### Performance notes
+Model resolution (`getModelTargetFormat`/`getModelStrip`/`getModelType`/
+`getModelUpstreamId`) is O(1) via a per-provider `Map` index built at load
+(see `open-sse/config/providerModels.js`). The SSE streaming path
+(`open-sse/utils/streamHandler.js`) does no per-chunk allocation. See
+`PERFORMANCE_OPTIMIZATION.md` for the full analysis and proposed single-flight
+token-refresh optimization.
+
+---
+
 ## 👥 Contributors
 
 Thanks to all contributors who helped make 9Router better!
