@@ -1419,6 +1419,14 @@ bare specifiers (40+ files error out). The config also excludes the live
 integration suite (`tests/translator/real/**`, `tests/e2e/**`) and a handful of
 environment-only unit files (see below) so the default run is hermetic.
 
+**Current status:** `npx vitest run --config vitest.config.js tests/unit`
+→ **947 passed / 21 skipped / 0 failed** (968 total), fully hermetic.
+
+### Notable regression tests
+- `tests/unit/codex-multiaccount-persistence.test.js` — #796: adding a second
+  Codex account (distinct email, same email + distinct `chatgptAccountId`, or
+  same email with no account id) always persists **two** rows; no silent merge.
+
 ### Live / environment-only tests (not run by default)
 - **Live** (`tests/translator/real/**`, `*.live.test.js`): hit real upstreams and
   may fail due to rate-limiting/network, not code defects. `mimo-free.live.test.js`

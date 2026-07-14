@@ -15,6 +15,7 @@
 - **Cloudflare-AI**: support accountId in bulk key import (#2449)
 - **DB**: backup on schema change, MCP child cleanup, codex models, usage providers OOM
 - **Codex**: avoid bare-email OAuth dedup (#2477)
+- **Codex**: regression-lock multi-account persistence (#796) — `tests/unit/codex-multiaccount-persistence.test.js`
 - **CLI**: allow staged app bundle builds (#2479)
 - **Headroom**: compress Kiro conversation state (#2488)
 - **Gemini-CLI**: raise output floor for thinking and add validated toolConfig (#2486)

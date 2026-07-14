@@ -256,11 +256,15 @@ export async function handleChatCore({
 - `kimchi.test.js`, `kimchi-strip-reasoning.test.js`: use Node `node:test`, not Vitest.
 
 ### Verification
-- Default unit suite is **fully green**: `npx vitest run --config vitest.config.js tests/unit`
-  → **942 passed / 21 skipped / 0 failed** (968 total). No failures remain.
+- Default unit suite is **fully green (hermetic)**: `npx vitest run --config vitest.config.js tests/unit`
+  → **947 passed / 21 skipped / 0 failed** (968 total). No failures remain.
 - `mimo-free.live.test.js` skips unless `MIMO_LIVE_TEST=1`; `embeddings.cloud`,
   `db-benchmark`, `kimchi*`, `antigravity-cache` are excluded/gated (env-only, not code bugs).
 - Each domain verified green by its owning subagent (or re-derived in-tree) before integration.
+- **#796 regression lock-in**: `tests/unit/codex-multiaccount-persistence.test.js` drives the
+  real `createProviderConnection` + `getProviderConnections` and asserts that adding a
+  second Codex account (distinct email, same email w/ distinct chatgptAccountId, or same
+  email w/ no chatgptAccountId) always yields **two rows** — no silent merge/overwrite.
 
 > **Incident note (cross-clone divergence):** subagent B wrote its translator edits into a
 > *different* checkout (`/home/don/9router`, HEAD `a42ce30` — a newer, restructured commit where
@@ -287,3 +291,35 @@ unfinished migration: a dead `src/sse` tree, a second 1,681-line provider config
 token-refresh systems. Finish the migration (delete dead tree, collapse provider config
 into the registry, unify refresh) and the maintainability risk drops sharply with zero
 behavior change.
+
+---
+
+## 7. Open-issue triage (2026-07-14 sweep)
+
+### #796 — "Can't Add More Codex as Provider" — MITIGATED (in-tree), regression-locked
+- Symptom: adding a second Codex account (UI or CLI) showed success but the new
+  account never appeared in the list.
+- Root cause analyzed end-to-end: `createProviderConnection` (src/lib/db/repos/connectionsRepo.js)
+  dedup logic. For `codex`, the merge branch (lines 122-125) only collapses an incoming
+  OAuth row onto an existing one when BOTH expose the **same** `chatgptAccountId`;
+  otherwise it creates a new row. This was hardened in commit `c73c419d` (2026-07-10).
+- Verification: `tests/unit/codex-multiaccount-persistence.test.js` drives the REAL
+  `createProviderConnection` + `getProviderConnections` with a temp `DATA_DIR` and asserts
+  that adding a second Codex account — (A) distinct emails, (B) same email + distinct
+  `chatgptAccountId`, (C) both missing `chatgptAccountId`, (D) same email + no account id,
+  (E) same email + account id only on the 2nd add — **always yields two rows**. All 5 pass.
+- Conclusion: the persistence layer is correct; #796's described symptom does not reproduce
+  in this tree. The fix is already present and now protected by regression tests.
+
+### SEPARATE finding (not #796) — CLI `saveTokens` is orphaned, TI path broken
+- `src/lib/oauth/services/codex.js` (and claude/gemini/github/antigravity/openai/qwen/iflow)
+  import `getServerCredentials` from `../config/index.js`, which **does not exist** in the tree.
+- Their `saveTokens()` POST to `/api/cli/providers/<provider>`, and **no `src/app/api/cli/*`
+  route exists** (upstream 404s too). The CLI prints "connected successfully!" regardless of
+  the server response, so a CLI add appears to succeed but writes nothing.
+- This is the most likely real cause of a user reporting "added via TI, success shown, didn't
+  appear" — but it is a broader CLI-integration gap, not the Codex-specific persistence bug.
+- Recommended follow-up (out of scope for this commit): create `src/app/api/cli/providers/*`
+  routes that delegate to `createProviderConnection` (mirroring `/api/oauth/kiro/api-key`),
+  fix the `getServerCredentials` import to the real module, and make `saveTokens` surface the
+  server error instead of swallowing it.
