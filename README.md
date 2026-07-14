@@ -1416,17 +1416,22 @@ npx vitest run --config vitest.config.js tests/unit/db-concurrent.test.js
 
 Running `vitest run` without `--config` fails to resolve `open-sse/...` and `@/...`
 bare specifiers (40+ files error out). The config also excludes the live
-integration suite (`tests/translator/real/**`, `tests/e2e/**`) so the default run
-is hermetic.
+integration suite (`tests/translator/real/**`, `tests/e2e/**`) and a handful of
+environment-only unit files (see below) so the default run is hermetic.
 
-### Test tiers
-- **Unit** (`tests/unit/**`): hermetic, no network. Run with the command above.
-- **Live** (`tests/translator/real/**`, `*.live.test.js`): gated behind
-  `RUN_REAL=1`, require network + live provider credentials. They hit real
-  upstreams and may fail due to rate-limiting/network, not code defects.
-- **Framework note**: `kimchi.test.js` / `kimchi-strip-reasoning.test.js` use
-  Node's built-in `node:test` runner, not Vitest — run them with
-  `node --test tests/unit/kimchi.test.js`.
+### Live / environment-only tests (not run by default)
+- **Live** (`tests/translator/real/**`, `*.live.test.js`): hit real upstreams and
+  may fail due to rate-limiting/network, not code defects. `mimo-free.live.test.js`
+  is gated behind `MIMO_LIVE_TEST=1` and skips otherwise. `antigravity-cache.test.js`
+  uses `AG_CACHE_TEST=1`. Enable and run explicitly when you want live coverage.
+- **Environment-only unit files** excluded from the default Vitest run:
+  - `embeddings.cloud.test.js` — imports `/cloud/src/handlers/embeddings.js`
+    (monorepo subpath absent in checkout).
+  - `db-benchmark.test.js` — benchmark needing the `lowdb` dependency.
+  - `kimchi.test.js` / `kimchi-strip-reasoning.test.js` — use Node's built-in
+    `node:test` runner, not Vitest (run with `node --test tests/unit/kimchi.test.js`).
+  These are setup/framework gaps, not code bugs; the default `tests/unit` run
+  excludes them and stays fully green.
 
 ### Performance notes
 Model resolution (`getModelTargetFormat`/`getModelStrip`/`getModelType`/
