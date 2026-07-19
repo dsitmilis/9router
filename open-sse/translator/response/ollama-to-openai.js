@@ -41,7 +41,28 @@ export function ollamaToOpenAIResponse(chunk, state) {
       finishReason = OPENAI_FINISH.TOOL_CALLS;
     }
 
-    const doneChunk = buildChunk({ id, created, model }, {}, finishReason);
+    const delta = {};
+    const message = chunk.message;
+    if (message) {
+      const content = typeof message.content === "string" ? message.content : "";
+      const thinking = typeof message.thinking === "string" ? message.thinking : "";
+      const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : null;
+
+      if (content) {
+        delta.content = content;
+        state.accumulatedContent = (state.accumulatedContent || "") + content;
+      }
+      if (thinking) {
+        delta.reasoning_content = thinking;
+        state.accumulatedThinking = (state.accumulatedThinking || "") + thinking;
+      }
+      if (toolCalls) {
+        delta.tool_calls = convertToolCalls(toolCalls);
+        state.hadToolCalls = true;
+      }
+    }
+
+    const doneChunk = buildChunk({ id, created, model }, delta, finishReason);
     doneChunk.usage = usage;
     return doneChunk;
   }
