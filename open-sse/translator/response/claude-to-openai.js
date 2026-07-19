@@ -62,7 +62,9 @@ export function claudeToOpenAIResponse(chunk, state) {
       } else if (block?.type === CLAUDE_BLOCK.THINKING) {
         state.inThinkingBlock = true;
         state.currentBlockIndex = chunk.index;
-        results.push(createChunk(state, { content: "<think>" }));
+        if (!state.isThinkingOff) {
+          results.push(createChunk(state, { content: "<think>" }));
+        }
       } else if (block?.type === CLAUDE_BLOCK.TOOL_USE) {
         const toolCallIndex = state.toolCallIndex++;
         // Restore original tool name from mapping (Claude OAuth)
@@ -89,7 +91,9 @@ export function claudeToOpenAIResponse(chunk, state) {
       if (delta?.type === "text_delta" && delta.text) {
         results.push(createChunk(state, { content: delta.text }));
       } else if (delta?.type === "thinking_delta" && delta.thinking) {
-        results.push(createChunk(state, reasoningDelta(delta.thinking)));
+        if (!state.isThinkingOff) {
+          results.push(createChunk(state, reasoningDelta(delta.thinking)));
+        }
       } else if (delta?.type === "input_json_delta" && delta.partial_json) {
         const toolCall = state.toolCalls.get(chunk.index);
         if (toolCall) {
@@ -113,7 +117,9 @@ export function claudeToOpenAIResponse(chunk, state) {
         break;
       }
       if (state.inThinkingBlock && chunk.index === state.currentBlockIndex) {
-        results.push(createChunk(state, { content: "</think>" }));
+        if (!state.isThinkingOff) {
+          results.push(createChunk(state, { content: "</think>" }));
+        }
         state.inThinkingBlock = false;
       }
       state.textBlockStarted = false;
